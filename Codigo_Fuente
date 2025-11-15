@@ -1,1 +1,90 @@
+#include <DHT.h>
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
 
+// --- Configuración de pines ---
+#define DHTPIN 2          // Pin del sensor DHT
+#define DHTTYPE DHT22     // En caso de que se utilice el dht11 cambiar al mismo
+#define RELAY_PIN 8       // Pin del relay
+
+// --- Inicialización de componentes ---
+DHT dht(DHTPIN, DHTTYPE);
+LiquidCrystal_I2C lcd(0x3F, 16, 2);  // 
+// --- Variables de control ---
+float humedad = 0.0;
+float temperatura = 0.0;
+const float HUMEDAD_MIN = 30.0;  // % mínima para activar bomba
+const float HUMEDAD_MAX = 80.0;  // % máxima para apagar bomba
+bool bombaActiva = false;
+
+void setup() {
+  Serial.begin(9600);
+  dht.begin();
+
+  // Inicializar LCD
+  lcd.init();
+  lcd.backlight();
+
+  // Configurar relay
+  pinMode(RELAY_PIN, OUTPUT);
+  digitalWrite(RELAY_PIN, LOW);
+
+  // Mensaje de inicio
+  lcd.setCursor(0, 0);
+  lcd.print("Sistema Hidrop.");
+  lcd.setCursor(0, 1);
+  lcd.print("Iniciando...");
+  delay(2000);
+  lcd.clear();
+}
+
+void loop() {
+  // Leer valores del sensor
+  humedad = dht.readHumidity();
+  temperatura = dht.readTemperature();
+
+  if (isnan(humedad) || isnan(temperatura)) {
+    Serial.println("Error al leer el sensor DHT!");
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print("Error sensor DHT");
+    delay(2000);
+    return;
+  }
+
+  // Mostrar en Serial
+  Serial.print("Temp: ");
+  Serial.print(temperatura);
+  Serial.print(" °C  |  Hum: ");
+  Serial.print(humedad);
+  Serial.println(" %");
+
+  // Lógica de control
+  if (humedad <= HUMEDAD_MIN) {
+    digitalWrite(RELAY_PIN, HIGH); // Encender bomba
+    bombaActiva = true;
+  } 
+  else if (humedad >= HUMEDAD_MAX) {
+    digitalWrite(RELAY_PIN, LOW);  // Apagar bomba
+    bombaActiva = false;
+  }
+
+  // Mostrar en LCD
+  lcd.setCursor(0, 0);
+  lcd.print("T:");
+  lcd.print(temperatura, 1);
+  lcd.print((char)223); // Símbolo de grado
+  lcd.print("C ");
+  lcd.print("H:");
+  lcd.print(humedad, 0);
+  lcd.print("% ");
+
+  lcd.setCursor(0, 1);
+  if (bombaActiva) {
+    lcd.print("Bomba: ON ");
+  } else {
+    lcd.print("Bomba: OFF");
+  }
+
+  delay(3000); // Actualiza cada 3 segundos
+}
